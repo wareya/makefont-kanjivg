@@ -1,0 +1,248 @@
+#!/usr/bin/fontforge -script
+
+import gc
+
+# ISC license
+
+def parsePaths(group):
+    # FIXME treating all paths as strokes
+    for _index, node in enumerate(group.getElementsByTagName("path")):
+        path = node.getAttribute("d")
+        commands = ()
+        while(len(path)):
+            if(path[0] in ", "):
+                path = path[1:]
+            elif(path[0] in "MmCcSs"):
+                commands += (path[0],)
+                path = path[1:]
+            else:
+                i = 0
+                while(i < len(path) and not path[i] in "MmCcSs ," and not(i > 0 and path[i] in "-")):
+                    i += 1
+                num1 = path[:i]
+                path = path[i:]
+                
+                while(len(path) and path[0] in ", "):
+                    path = path[1:]
+                
+                i = 0
+                while(i < len(path) and not path[i] in "MmCcSs ," and not(i > 0 and path[i] in "-")):
+                    i += 1
+                num2 = path[:i]
+                path = path[i:]
+                commands += (num1 + "," + num2,)
+        
+        x = 0
+        y = 0
+        reflectx = 0
+        reflecty = 0
+        until = 0
+        mode = ""
+        
+        #print(commands)
+        
+        i = 0
+        while i < len(commands):
+            # FIXME only MmCc implemented
+            if commands[i] == "M":
+                mode = "M"
+                i += 1
+                continue
+            elif commands[i] == "m":
+                mode = "m"
+                i += 1
+                continue
+            elif commands[i] == "C":
+                mode = "C"
+                i += 1
+                continue
+            elif commands[i] == "c":
+                mode = "c"
+                i += 1
+                continue
+            elif commands[i] == "S":
+                mode = "S"
+                i += 1
+                continue
+            elif commands[i] == "s":
+                mode = "s"
+                i += 1
+                continue
+            
+            if mode == "M":
+                coords = commands[i].split(",")
+                x = float(coords[0])
+                y = float(coords[1])
+                reflectx = x
+                reflecty = y
+                layer = glyph.layers[1]
+                layer += fontforge.contour()
+                layer[len(layer)-1].moveTo(x, y)
+                glyph.layers[1] = layer
+                i += 1
+                continue
+            if mode == "m":
+                coords = commands[i].split(",")
+                x += float(coords[0])
+                y += float(coords[1])
+                reflectx = x
+                reflecty = y
+                layer = glyph.layers[1]
+                layer += fontforge.contour()
+                layer[len(layer)-1].moveTo(x, y)
+                glyph.layers[1] = layer
+                i += 1
+                continue
+            if mode == "C":
+                coords1 = commands[i].split(",")
+                coords2 = commands[i+1].split(",")
+                coords3 = commands[i+2].split(",")
+                
+                layer = glyph.layers[1]
+                layer[len(layer)-1] \
+                     .cubicTo( float(coords1[0]), float(coords1[1])
+                             , float(coords2[0]), float(coords2[1])
+                             , float(coords3[0]), float(coords3[1]))
+                glyph.layers[1] = layer
+                
+                x = float(coords3[0])
+                y = float(coords3[1])
+                reflectx = 2*x - float(coords2[0])
+                reflecty = 2*y - float(coords2[1])
+                i += 3
+                continue
+            if mode == "c":
+                coords1 = commands[i].split(",")
+                coords2 = commands[i+1].split(",")
+                coords3 = commands[i+2].split(",")
+                
+                layer = glyph.layers[1]
+                layer[len(layer)-1] \
+                     .cubicTo( float(coords1[0]) + x, float(coords1[1]) + y
+                             , float(coords2[0]) + x, float(coords2[1]) + y
+                             , float(coords3[0]) + x, float(coords3[1]) + y)
+                glyph.layers[1] = layer
+                
+                
+                grr1 = float(coords2[0]) + x
+                grr2 = float(coords2[1]) + y
+                x = float(coords3[0]) + x
+                y = float(coords3[1]) + y
+                reflectx = 2*x - grr1
+                reflecty = 2*y - grr2
+                i += 3
+                continue
+            if mode == "S":
+                coords2 = commands[i].split(",")
+                coords3 = commands[i+1].split(",")
+                
+                layer = glyph.layers[1]
+                layer[len(layer)-1] \
+                     .cubicTo( reflectx, reflecty
+                             , float(coords2[0]), float(coords2[1])
+                             , float(coords3[0]), float(coords3[1]))
+                glyph.layers[1] = layer
+                
+                x = float(coords3[0])
+                y = float(coords3[1])
+                reflectx = 2*x - float(coords2[0])
+                reflecty = 2*y - float(coords2[1])
+                i += 2
+                continue
+            if mode == "s":
+                coords2 = commands[i].split(",")
+                coords3 = commands[i+1].split(",")
+                
+                layer = glyph.layers[1]
+                layer[len(layer)-1] \
+                     .cubicTo( reflectx, reflecty
+                             , float(coords2[0]) + x, float(coords2[1]) + y
+                             , float(coords3[0]) + x, float(coords3[1]) + y)
+                glyph.layers[1] = layer
+                
+                x = float(coords3[0]) + x
+                y = float(coords3[1]) + y
+                reflectx = 2*x - float(coords2[0]) + x
+                reflecty = 2*y - float(coords2[1]) + y
+                i += 2
+                continue
+        
+        #print ("Finished commands")
+
+import re
+import os
+import fontforge
+from xml.dom.minidom import parse
+
+font = fontforge.font()
+font.ascent = 1000
+font.descent = 0
+
+# The KanjiVG data does not contain characters, so we need to make them manually.
+# Setting the width of a glyph makes it be an occupied glyph, so that's all we need to do.
+glyph = font.createChar(0x20) # codepoint of ASCII space
+glyph.width = 1000
+glyph = font.createChar(0x3000) # codepoint of ideographic space
+glyph.width = 1000
+
+# In the future, I plan to have a supplementary set of SVGs covering the full breadth of normal punctuation.
+# However, spaces are simply too important to let sit doing nothing.
+
+scale = 1
+which = 2
+for name in list(filter(lambda name: re.match(".....\.svg", name) , os.listdir())):
+    glyph = font.createChar(int(name[0:5], 16))
+    glyph.width = 1000
+    print("Reading from " + name + " -- " + str(which))
+    which += 1
+    with parse(name) as root:
+        scale = 1000/float(root.getElementsByTagName("svg")[0].getAttribute("width"))
+        for index, svgroot in \
+            enumerate(root.
+            getElementsByTagName("svg")) \
+        :
+            parsePaths(svgroot)
+    gc.collect()
+
+font.selection.all()
+
+print ("Preparing font")
+font.transform(psMat.scale(scale, -scale))
+font.transform(psMat.translate(0, 1000))
+
+print ("Transformed")
+font.stroke("circular",3*scale,"round")
+print ("Stroked")
+
+# Now that the glyph is generated we need to clean it up.
+# We need to remove overlap, but we need to round it first because of bugs.
+# We need to simplify before rounding because of "The curve is too short." from "removeOverlap"
+# Simplify can cause unrounded points, which will cause bugs in removeOverlap.
+# We need to round before removeOverlap anyways, and we also need to round after simplify.
+font.simplify(1,("smoothcurves", "mergelines", "forcelines", "setstarttoextremum", "removesingletonpoints"))
+font.round()
+print ("rounded")
+font.removeOverlap()
+print ("Cleaned up pt 1")
+# removeOverlap can and will cause very short paths to occur, and can cause nearly-same-location points.
+# We need to simplify to remove them.
+# However, we need to round after simplifying. 
+# However, the last shapechanging instruction done to a glyph aught to be "removeOverlap".
+# ... Therefore, we essentially need to duplicate the above code again.
+font.simplify(1,("smoothcurves", "mergelines", "forcelines", "setstarttoextremum", "removesingletonpoints"))
+font.round()
+font.removeOverlap()
+print ("Cleaned up pt 2")
+
+
+font.generate('testfont.otf')
+
+
+
+
+
+
+
+
+
+
