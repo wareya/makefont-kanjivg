@@ -160,10 +160,12 @@ def parsePaths(group):
                              , float(coords3[0]) + x, float(coords3[1]) + y)
                 glyph.layers[1] = layer
                 
+                grr1 = float(coords2[0]) + x
+                grr2 = float(coords2[1]) + y
                 x = float(coords3[0]) + x
                 y = float(coords3[1]) + y
-                reflectx = 2*x - float(coords2[0]) + x
-                reflecty = 2*y - float(coords2[1]) + y
+                reflectx = 2*x - grr1
+                reflecty = 2*y - grr2
                 i += 2
                 continue
         
